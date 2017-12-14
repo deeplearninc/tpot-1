@@ -29,7 +29,6 @@ import inspect
 import warnings
 import sys
 import imp
-import redis
 from functools import partial
 from datetime import datetime
 from multiprocessing import cpu_count
@@ -76,6 +75,8 @@ from .gp_deap import eaMuPlusLambda, mutNodeReplacement, _wrapped_cross_val_scor
 import traceback
 import pickle
 
+from auger_messenger import AugerMessenger
+
 # hot patch for Windows: solve the problem of crashing python after Ctrl + C in Windows OS
 # https://github.com/ContinuumIO/anaconda-issues/issues/905
 if sys.platform.startswith('win'):
@@ -109,7 +110,7 @@ class TPOTBase(BaseEstimator):
                  warm_start=False, memory=None,
                  periodic_checkpoint_folder=None, early_stop=None,
                  verbosity=0, disable_update_check=False,
-                 redis_info=None, sc=None, over_sampler=None):
+                 msg_info=None, sc=None, over_sampler=None):
         """Set up the genetic programming algorithm for pipeline optimization.
 
         Parameters
@@ -265,13 +266,11 @@ class TPOTBase(BaseEstimator):
         self.max_time_mins = max_time_mins
         self.max_eval_time_mins = max_eval_time_mins
 
-        self.redis_info = redis_info
+        # DeepLearn code
         self.sc = sc
         self.over_sampler = over_sampler
-        self.r = None
-        if self.redis_info:
-            print("Redis init.")
-            self.r = redis.StrictRedis(host=self.redis_info['host'], port=self.redis_info['port'], db=self.redis_info['db'])
+        self.auger_messenger = AugerMessenger(msg_info)
+        # DeepLearn code
 
         self.max_eval_time_seconds = max(int(self.max_eval_time_mins * 60), 1)
         self.periodic_checkpoint_folder = periodic_checkpoint_folder
@@ -628,9 +627,9 @@ class TPOTBase(BaseEstimator):
         self._pbar = tqdm(total=total_evals, unit='pipeline', leave=False,
                           disable=not (self.verbosity >= 2), desc='Optimization Progress')
 
-        if self.r is not None:
-            total_eval_str = pickle.dumps({'total_evaluation': total_evals})
-            self.r.publish(self.redis_info['channel'], total_eval_str)
+        # DeepLearn code
+        self.auger_messenger.send_total_eval(total_evals)
+        # DeepLearn code
 
         try:
             with warnings.catch_warnings():
@@ -685,9 +684,9 @@ class TPOTBase(BaseEstimator):
                     if attempt == (attempts - 1):
                         raise
 
-            if self.r is not None:
-                status = pickle.dumps({'evaluation_status': 'complete'})
-                self.r.publish(self.redis_info['channel'],status)
+            # DeepLearn code
+            self.auger_messenger.send_status_eval('complete')
+            # DeepLearn code
             return self
 
     def _setup_memory(self):
@@ -1171,7 +1170,7 @@ class TPOTBase(BaseEstimator):
                 sample_weight=sample_weight,
                 groups=groups,
                 timeout=self.max_eval_time_seconds,
-                redis_info=self.redis_info,
+                msg_info=self.auger_messenger.conn_info,
                 over_sampler=self.over_sampler
             )
 
@@ -1179,7 +1178,7 @@ class TPOTBase(BaseEstimator):
             #DeepLearn code
             if self.sc is not None:
                 arPipelines = []
-                redis_info = self.redis_info
+                msg_info = self.auger_messenger.conn_info
                 max_eval_time_seconds = self.max_eval_time_seconds
                 scoring_function = self.scoring_function
                 cv = self.cv
@@ -1195,7 +1194,7 @@ class TPOTBase(BaseEstimator):
                         sample_weight=sample_weight,
                         groups=groups,
                         timeout=max_eval_time_seconds, #self.max_eval_time_mins,
-                        redis_info=redis_info, #self.redis_info,
+                        msg_info=msg_info,
                         over_sampler=over_sampler
                     ))
             #DeepLearn code
