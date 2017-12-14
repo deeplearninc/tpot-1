@@ -20,7 +20,7 @@ class AugerMessenger:
 
     def send_scores(self, sklearn_pipeline, features, target, scores):
         if self.conn_info:
-            sklearn_pipeline_json = _format_pipeline_json(sklearn_pipeline.steps,features,target)
+            sklearn_pipeline_json = self._format_pipeline_json(sklearn_pipeline.steps,features,target)
             sklearn_pipeline_json['score'] = np.nanmean(scores)
             json = {self.uid: sklearn_pipeline_json}
             self.r.publish(self.conn_info['channel'], pickle.dumps(json))
@@ -33,3 +33,9 @@ class AugerMessenger:
     def send_status_eval(self, status):
         if self.conn_info:
             self.r.publish(self.conn_info['channel'], pickle.dumps({'evaluation_status': status}))
+
+    def _format_pipeline_json(self, pipeline,features,target):
+        json = {'pipeline_list':[],'func_dict':{}}
+        json['feature_matrix'] = collect_feature_list(pipeline,features,target)
+        serialize_to_js(pipeline,json['pipeline_list'],json['func_dict'])
+        return json

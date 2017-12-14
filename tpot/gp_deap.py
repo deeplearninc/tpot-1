@@ -400,14 +400,6 @@ def mutNodeReplacement(individual, pset):
             individual[slice_] = new_subtree
     return individual,
 
-# DeepLearn code
-def _format_pipeline_json(pipeline,features,target):
-    json = {'pipeline_list':[],'func_dict':{}}
-    json['feature_matrix'] = collect_feature_list(pipeline,features,target)
-    serialize_to_js(pipeline,json['pipeline_list'],json['func_dict'])
-    return json
-# DeepLearn code
-
 @threading_timeoutable(default="Timeout")
 def _wrapped_cross_val_score(sklearn_pipeline, features, target,
                              cv, scoring_function, sample_weight=None, groups=None,
