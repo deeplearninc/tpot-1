@@ -1,37 +1,42 @@
+import os
+import time
 import numpy as np
-
-import redis
 import uuid
-import pickle
 from .pipeline_exports import collect_feature_list, serialize_to_js
+from auger_fsclient import AugerFSClient
 
 class AugerMessenger:
     def __init__(self, conn_info):
         self.conn_info = conn_info
-        self.uid = uuid.uuid4().hex[:15].upper()
 
-        if self.conn_info:
-            self.r = redis.StrictRedis(host=conn_info['host'], port=conn_info['port'], db=conn_info['db'])
+        if conn_info:
+            self.fs_client = AugerFSClient( os.path.join(conn_info['host'], conn_info['channel']) )
+            #self.r = redis.StrictRedis(host=conn_info['host'], port=conn_info['port'], db=conn_info['db'])
 
-    def send_started(self, cv_num):
-        self._send_message({'started': 1})
-        #self.r.hset(self.conn_info['channel'], self.uid + '-fold', cv_num)
+    def send_scores(self, sklearn_pipeline, features, target, scores, error = None):
+        uid = uuid.uuid4().hex[:15].upper()            
+        data = {'uid': uid}
+        data['pipeline'] = self._format_pipeline_json(sklearn_pipeline.steps,features,target)
+        data['scores'] = scores
+        data['score_mean'] = np.nanmean(scores) if len(scores) else 0
+        data['error'] = error
+        self._send_message_to_pipelines("score", data, uid)
 
-    def send_scores(self, sklearn_pipeline, features, target, scores):
-        sklearn_pipeline_json = self._format_pipeline_json(sklearn_pipeline.steps,features,target)
-        sklearn_pipeline_json['score'] = np.nanmean(scores)
-        self._send_message({self.uid: sklearn_pipeline_json})
+    def send_status_eval(self, status, total_evals=0):
+        self._send_message( 'evaluation_status', {'status': status, 'total_evaluation': total_evals})
 
-    def send_total_eval(self, total_evals):
-        self._send_message({'total_evaluation': total_evals})
+    def _send_message(self, prefix, msg):
+        if self.fs_client:
+            file_name = "%s.json"%(prefix)
+            self.fs_client.write_json_file(file_name, msg)
 
-    def send_status_eval(self, status):
-        self._send_message({'evaluation_status': status})
+    def _send_message_to_pipelines(self, prefix, msg, uid):
+        if self.fs_client:
+            file_name = "pipelines/%s_%s.json"%(prefix, uid)
+            tmp_file_name = os.path.join("pipelines/tmp", file_name)
 
-    def _send_message(self, msg):
-        print(msg)
-        if self.conn_info:
-            self.r.publish(self.conn_info['channel'], pickle.dumps(msg))
+            self.fs_client.write_json_file(tmp_file_name, msg)
+            self.fs_client.rename_file(tmp_file_name, file_name)
 
     def _format_pipeline_json(self, pipeline,features,target):
         json = {'pipeline_list':[],'func_dict':{}}

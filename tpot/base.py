@@ -628,7 +628,7 @@ class TPOTBase(BaseEstimator):
                           disable=not (self.verbosity >= 2), desc='Optimization Progress')
 
         # DeepLearn code
-        self.auger_messenger.send_total_eval(total_evals)
+        self.auger_messenger.send_status_eval('started', total_evals)
         # DeepLearn code
 
         try:
@@ -685,7 +685,7 @@ class TPOTBase(BaseEstimator):
                         raise
 
             # DeepLearn code
-            self.auger_messenger.send_status_eval('complete')
+            self.auger_messenger.send_status_eval('completed', total_evals)
             # DeepLearn code
             return self
 

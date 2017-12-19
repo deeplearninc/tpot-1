@@ -427,6 +427,13 @@ def _wrapped_cross_val_score(sklearn_pipeline, features, target,
     groups: array-like {n_samples, }, optional
         Group labels for the samples used while splitting the dataset into train/test set
     """
+    # DeepLearn code
+    aMsg = AugerMessenger(msg_info)
+    CV_scores = []
+    res = -1
+    error = None
+    # DeepLearn code
+
     try:
         sample_weight_dict = set_sample_weight(sklearn_pipeline.steps, sample_weight)
 
@@ -436,11 +443,6 @@ def _wrapped_cross_val_score(sklearn_pipeline, features, target,
         cv.random_state = cv_num
         cv_iter = list(cv.split(features, target, groups))
         scorer = check_scoring(sklearn_pipeline, scoring=scoring_function)
-
-        # DeepLearn code
-        aMsg = AugerMessenger(msg_info)
-        aMsg.send_started(cv_num)
-        # DeepLearn code
 
         with warnings.catch_warnings():
             warnings.simplefilter('ignore')
@@ -457,9 +459,8 @@ def _wrapped_cross_val_score(sklearn_pipeline, features, target,
                 #scores.append(score)
 
             #CV_score = np.array(scores)[:, 0]
-
+            
             # DeepLearn code
-            CV_score = []
             for train_index, test_index in cv_iter:
                 estimator = clone(sklearn_pipeline)
                 fit_params=sample_weight_dict
@@ -474,18 +475,17 @@ def _wrapped_cross_val_score(sklearn_pipeline, features, target,
 
                 estimator.fit(X_resampled, y_resampled)
                 score = _score(estimator, X_test1, y_test1, scorer)
-                CV_score.append(score)
-
-            aMsg.send_scores(sklearn_pipeline,features,target, CV_score)
+                CV_scores.append(score)
             # DeepLearn code
 
-            return np.nanmean(CV_score)
+            res = np.nanmean(CV_scores)
     except TimeoutException:
-        return "Timeout"
+        error = res = "Timeout"
     except Exception as e:
         str_error = "Error: while running _wrapped_cross_val_score : %s\nTrace:\n%s" % (str(e), traceback.format_exc()) 
+        res = str_error
+        error = str(e)
         print(str_error)
-        return str_error
-        #print("Error while running _wrapped_cross_val_score : %s" % str(e))
-        #print(traceback.format_exc())
-        #return -float('inf')
+
+    aMsg.send_scores(sklearn_pipeline, features, target, CV_scores, error)
+    return res
