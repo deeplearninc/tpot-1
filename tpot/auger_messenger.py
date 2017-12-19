@@ -8,7 +8,8 @@ from auger_fsclient import AugerFSClient
 class AugerMessenger:
     def __init__(self, conn_info):
         self.conn_info = conn_info
-
+        self.fs_client = None
+        
         if conn_info:
             self.fs_client = AugerFSClient( os.path.join(conn_info['host'], conn_info['channel']) )
             #self.r = redis.StrictRedis(host=conn_info['host'], port=conn_info['port'], db=conn_info['db'])
