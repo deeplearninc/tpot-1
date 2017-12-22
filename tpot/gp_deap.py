@@ -44,8 +44,6 @@ import re
 import traceback
 import time
 
-from auger_messenger import AugerMessenger
-
 def pick_two_individuals_eligible_for_crossover(population):
     """Pick two individuals from the population which can do crossover, that is, they share a primitive.
 
@@ -403,7 +401,7 @@ def mutNodeReplacement(individual, pset):
 @threading_timeoutable(default="Timeout")
 def _wrapped_cross_val_score(sklearn_pipeline, features, target,
                              cv, scoring_function, sample_weight=None, groups=None,
-                             msg_info = None, over_sampler = None):
+                             over_sampler = None):
     """Fit estimator and compute scores for a given dataset split.
     Parameters
     ----------
@@ -428,7 +426,6 @@ def _wrapped_cross_val_score(sklearn_pipeline, features, target,
         Group labels for the samples used while splitting the dataset into train/test set
     """
     # DeepLearn code
-    aMsg = AugerMessenger(msg_info)
     CV_scores = []
     res = -1
     error = None
@@ -459,7 +456,7 @@ def _wrapped_cross_val_score(sklearn_pipeline, features, target,
                 #scores.append(score)
 
             #CV_score = np.array(scores)[:, 0]
-            
+
             # DeepLearn code
             for train_index, test_index in cv_iter:
                 estimator = clone(sklearn_pipeline)
@@ -482,10 +479,7 @@ def _wrapped_cross_val_score(sklearn_pipeline, features, target,
     except TimeoutException:
         error = res = "Timeout"
     except Exception as e:
-        str_error = "Error: while running _wrapped_cross_val_score : %s\nTrace:\n%s" % (str(e), traceback.format_exc()) 
-        res = str_error
-        error = str(e)
-        print(str_error)
+        error = res = str(e)
+        print("Error: while running _wrapped_cross_val_score : %s\nTrace:\n%s" % (str(e), traceback.format_exc()))
 
-    aMsg.send_scores(sklearn_pipeline, features, target, CV_scores, error)
-    return res
+    return {'scores': CV_scores, "error": error, "result": res}

@@ -51,7 +51,7 @@ def get_by_name(opname, operators):
     return ret_op_class
 
 
-def export_pipeline(exported_pipeline, operators, pset, impute=False, pipeline_score=None):
+def export_pipeline(exported_pipeline, operators, pset, impute=False, pipeline_score=None, auger_export = False):
     """Generate source code for a TPOT Pipeline.
 
     Parameters
@@ -75,14 +75,18 @@ def export_pipeline(exported_pipeline, operators, pset, impute=False, pipeline_s
     # Have the exported code import all of the necessary modules and functions
     pipeline_text = generate_import_code(exported_pipeline, operators, impute)
 
-    pipeline_code = pipeline_code_wrapper(generate_export_pipeline_code(pipeline_tree, operators))
-
+    if auger_export:
+        pipeline_code = "exported_pipeline = " + generate_export_pipeline_code(pipeline_tree, operators)
+    else:
+        pipeline_code = pipeline_code_wrapper(generate_export_pipeline_code(pipeline_tree, operators))
+        
     if pipeline_code.count("FunctionTransformer(copy)"):
         pipeline_text += """from sklearn.preprocessing import FunctionTransformer
 from copy import copy
 """
 
-    pipeline_text += """
+    if not auger_export:
+        pipeline_text += """
 # NOTE: Make sure that the class is labeled 'target' in the data file
 tpot_data = pd.read_csv('PATH/TO/DATA/FILE', sep='COLUMN_SEPARATOR', dtype=np.float64)
 features = tpot_data.drop('target', axis=1).values
