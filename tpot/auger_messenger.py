@@ -28,7 +28,7 @@ class AugerMessenger:
         self._send_message_to_pipelines("score", data, uid)
 
     def send_status_eval(self, status, total_evals=0):
-        self._send_message( 'evaluation_status', {'status': status, 'total_evaluation': total_evals})
+        self._send_message( 'evaluation_status', {'status': status, 'total_evaluations': total_evals})
 
     def _send_message(self, prefix, msg):
         if self.fs_client:
