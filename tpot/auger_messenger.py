@@ -2,7 +2,6 @@ import os
 import time
 import numpy as np
 import uuid
-from .pipeline_exports import collect_feature_list, serialize_to_js
 from auger_fsclient import AugerFSClient
 from .export_utils import export_pipeline
 
@@ -21,7 +20,8 @@ class AugerMessenger:
         data.update(result)
         data.pop('result', None)
 
-        data['pipeline'] = self._format_pipeline_json(sklearn_pipeline.steps, features, target)
+        #data['pipeline'] = self._format_pipeline_json(sklearn_pipeline.steps, features, target)
+        data['feature_matrix'] = self._collect_feature_list(sklearn_pipeline, features, target)
         data['score_mean'] = np.nanmean(data['scores']) if len(data['scores']) else 0
         data['exported_pipeline'] = export_pipeline(individual, tpot_instance.operators, tpot_instance._pset, tpot_instance._imputed, data['score_mean'], True)
 
@@ -43,8 +43,17 @@ class AugerMessenger:
             self.fs_client.write_json_file(tmp_file_name, msg)
             self.fs_client.rename_file(tmp_file_name, file_name)
 
-    def _format_pipeline_json(self, pipeline,features,target):
-        json = {'pipeline_list':[],'func_dict':{}}
-        json['feature_matrix'] = collect_feature_list(pipeline,features,target)
-        serialize_to_js(pipeline,json['pipeline_list'],json['func_dict'])
-        return json
+    def _collect_feature_list(self, pipeline, features, target):
+        feature_list = []
+        for step in pipeline.steps:
+            if step[1].__class__.__name__ == 'FeatureUnion':
+                transformer_list = step[1].transformer_list
+                for transformer in transformer_list:
+                    if "get_support" in dir(transformer[1]):
+                        fit_step = transformer[1].fit(features, target)
+                        feature_list.append(fit_step.get_support().tolist())
+
+            if "get_support" in dir(step[1]):
+                fit_step = step[1].fit(features, target)
+                feature_list.append(fit_step.get_support().tolist())
+        return feature_list

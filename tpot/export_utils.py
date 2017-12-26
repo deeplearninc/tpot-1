@@ -76,7 +76,7 @@ def export_pipeline(exported_pipeline, operators, pset, impute=False, pipeline_s
     pipeline_text = generate_import_code(exported_pipeline, operators, impute)
 
     if auger_export:
-        pipeline_code = "exported_pipeline = " + generate_export_pipeline_code(pipeline_tree, operators)
+        pipeline_code = "exported_pipeline = " + generate_pipeline_code(pipeline_tree, operators)
     else:
         pipeline_code = pipeline_code_wrapper(generate_export_pipeline_code(pipeline_tree, operators))
         
@@ -239,7 +239,8 @@ def _starting_imports(operators, operators_used):
     # if operators # == 1 and classifier/regressor # == 1, this import statement is simpler
     else:
         return {
-            'sklearn.model_selection':  ['train_test_split']
+            'sklearn.model_selection':  ['train_test_split'],
+            'sklearn.pipeline':         ['make_pipeline']
         }
 
 
