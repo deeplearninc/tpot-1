@@ -40,10 +40,6 @@ import warnings
 from stopit import threading_timeoutable, TimeoutException
 
 import threading
-import redis
-import uuid
-import pickle
-from .pipeline_exports import collect_feature_list, serialize_to_js
 import re
 import traceback
 import time
@@ -402,18 +398,10 @@ def mutNodeReplacement(individual, pset):
             individual[slice_] = new_subtree
     return individual,
 
-# DeepLearn code
-def _format_pipeline_json(pipeline,features,target):
-    json = {'pipeline_list':[],'func_dict':{}}
-    json['feature_matrix'] = collect_feature_list(pipeline,features,target)
-    serialize_to_js(pipeline,json['pipeline_list'],json['func_dict'])
-    return json
-# DeepLearn code
-
 @threading_timeoutable(default="Timeout")
 def _wrapped_cross_val_score(sklearn_pipeline, features, target,
                              cv, scoring_function, sample_weight=None, groups=None,
-                             redis_info = None, over_sampler = None):
+                             over_sampler = None):
     """Fit estimator and compute scores for a given dataset split.
     Parameters
     ----------
@@ -437,6 +425,12 @@ def _wrapped_cross_val_score(sklearn_pipeline, features, target,
     groups: array-like {n_samples, }, optional
         Group labels for the samples used while splitting the dataset into train/test set
     """
+    # DeepLearn code
+    CV_scores = []
+    res = -1
+    error = None
+    # DeepLearn code
+
     try:
         sample_weight_dict = set_sample_weight(sklearn_pipeline.steps, sample_weight)
 
@@ -446,21 +440,9 @@ def _wrapped_cross_val_score(sklearn_pipeline, features, target,
         cv.random_state = cv_num
         cv_iter = list(cv.split(features, target, groups))
         scorer = check_scoring(sklearn_pipeline, scoring=scoring_function)
-        # DeepLearn code
-        if redis_info is not None:
-            uid = uuid.uuid4().hex[:15].upper()
-            sklearn_pipeline_json = _format_pipeline_json(sklearn_pipeline.steps,features,target)
-            r = redis.StrictRedis(host=redis_info['host'], port=redis_info['port'], db=redis_info['db'])
-            json = {'started': 1}
-            r.publish(redis_info['channel'], pickle.dumps(json))
-            r.hset(redis_info['channel'], uid + '-fold', cv_num)
 
-        # DeepLearn code
-        #print(over_sampler)
         with warnings.catch_warnings():
             warnings.simplefilter('ignore')
-            scores = []
-
             #for train, test in cv_iter:
                 # score = _fit_and_score(estimator=clone(sklearn_pipeline),
                 #                         X=features,
@@ -475,6 +457,7 @@ def _wrapped_cross_val_score(sklearn_pipeline, features, target,
 
             #CV_score = np.array(scores)[:, 0]
 
+            # DeepLearn code
             for train_index, test_index in cv_iter:
                 estimator = clone(sklearn_pipeline)
                 fit_params=sample_weight_dict
@@ -489,23 +472,14 @@ def _wrapped_cross_val_score(sklearn_pipeline, features, target,
 
                 estimator.fit(X_resampled, y_resampled)
                 score = _score(estimator, X_test1, y_test1, scorer)
-                scores.append(score)
-
-            CV_score = scores        
-            # DeepLearn code
-            if redis_info is not None:
-                sklearn_pipeline_json['score'] = np.nanmean(CV_score)
-                json = {uid: sklearn_pipeline_json}
-                r.publish(redis_info['channel'], pickle.dumps(json))
+                CV_scores.append(score)
             # DeepLearn code
 
-            return np.nanmean(CV_score)
+            res = np.nanmean(CV_scores)
     except TimeoutException:
-        return "Timeout"
+        error = res = "Timeout"
     except Exception as e:
-        str_error = "Error: while running _wrapped_cross_val_score : %s\nTrace:\n%s" % (str(e), traceback.format_exc()) 
-        print(str_error)
-        return str_error
-        #print("Error while running _wrapped_cross_val_score : %s" % str(e))
-        #print(traceback.format_exc())
-        #return -float('inf')
+        error = res = str(e)
+        print("Error: while running _wrapped_cross_val_score : %s\nTrace:\n%s" % (str(e), traceback.format_exc()))
+
+    return {'scores': CV_scores, "error": error, "result": res}
