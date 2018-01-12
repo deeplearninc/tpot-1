@@ -51,7 +51,7 @@ def get_by_name(opname, operators):
     return ret_op_class
 
 
-def export_pipeline(exported_pipeline, operators, pset, impute=False, pipeline_score=None, auger_export = False):
+def export_pipeline(exported_pipeline, operators, pset, impute=False, pipeline_score=None, auger_export = True):
     """Generate source code for a TPOT Pipeline.
 
     Parameters
