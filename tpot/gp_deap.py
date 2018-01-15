@@ -426,11 +426,12 @@ def _wrapped_cross_val_score(sklearn_pipeline, features, target,
         Group labels for the samples used while splitting the dataset into train/test set
     """
     # DeepLearn code
+    from auger_messenger import AugerMessenger
     CV_scores = []
     res = -1
     error = None
+    feature_matrix = None
     # DeepLearn code
-    print("Start _wrapped_cross_val_score")
 
     try:
         sample_weight_dict = set_sample_weight(sklearn_pipeline.steps, sample_weight)
@@ -472,11 +473,13 @@ def _wrapped_cross_val_score(sklearn_pipeline, features, target,
                     X_resampled, y_resampled = X_train1, y_train1
 
                 estimator.fit(X_resampled, y_resampled)
+                if feature_matrix is None:
+                    feature_matrix = AugerMessenger.collect_feature_list(estimator)
+
                 score = _score(estimator, X_test1, y_test1, scorer)
                 CV_scores.append(score)
             # DeepLearn code
 
-            print("End _wrapped_cross_val_score")
             res = np.nanmean(CV_scores)
     except TimeoutException:
         error = res = "Timeout"
@@ -484,4 +487,7 @@ def _wrapped_cross_val_score(sklearn_pipeline, features, target,
         error = res = str(e)
         print("Error: while running _wrapped_cross_val_score : %s\nTrace:\n%s" % (str(e), traceback.format_exc()))
 
-    return {'scores': CV_scores, "error": error, "result": res}
+    if feature_matrix is None:
+        feature_matrix = []
+
+    return {'scores': CV_scores, "error": error, "result": res, "feature_matrix": feature_matrix}
