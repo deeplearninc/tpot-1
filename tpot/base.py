@@ -1159,7 +1159,7 @@ class TPOTBase(BaseEstimator):
         try:
 
             operator_counts, eval_individuals_str, sklearn_pipeline_list, stats_dicts, unique_individuals = self._preprocess_individuals(individuals)
-
+            print(sklearn_pipeline_list)
             # Make the partial function that will be called below
             partial_wrapped_cross_val_score = partial(
                 _wrapped_cross_val_score,

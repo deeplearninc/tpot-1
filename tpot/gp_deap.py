@@ -430,6 +430,7 @@ def _wrapped_cross_val_score(sklearn_pipeline, features, target,
     res = -1
     error = None
     # DeepLearn code
+    print("Start _wrapped_cross_val_score")
 
     try:
         sample_weight_dict = set_sample_weight(sklearn_pipeline.steps, sample_weight)
@@ -475,6 +476,7 @@ def _wrapped_cross_val_score(sklearn_pipeline, features, target,
                 CV_scores.append(score)
             # DeepLearn code
 
+            print("End _wrapped_cross_val_score")
             res = np.nanmean(CV_scores)
     except TimeoutException:
         error = res = "Timeout"
