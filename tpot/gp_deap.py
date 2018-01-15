@@ -431,6 +431,7 @@ def _wrapped_cross_val_score(sklearn_pipeline, features, target,
     res = -1
     error = None
     feature_matrix = None
+    print("Start _wrapped_cross_val_score: %s"%str(sklearn_pipeline))
     # DeepLearn code
 
     try:
@@ -490,4 +491,6 @@ def _wrapped_cross_val_score(sklearn_pipeline, features, target,
     if feature_matrix is None:
         feature_matrix = []
 
-    return {'scores': CV_scores, "error": error, "result": res, "feature_matrix": feature_matrix}
+    response =  {'scores': CV_scores, "error": error, "result": res, "feature_matrix": feature_matrix}
+    print("End _wrapped_cross_val_score: %s\n%s"%(str(sklearn_pipeline), str(response)))
+    return response
