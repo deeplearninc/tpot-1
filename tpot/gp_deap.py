@@ -491,6 +491,9 @@ def _wrapped_cross_val_score(sklearn_pipeline, features, target,
     if feature_matrix is None:
         feature_matrix = []
 
+    if error is not None and len(CV_scores) > 0:
+        res = np.nanmean(CV_scores)
+                
     response =  {'scores': CV_scores, "error": error, "result": res, "feature_matrix": feature_matrix}
     print("End _wrapped_cross_val_score: %s\n%s"%(str(sklearn_pipeline), str(response)))
     return response

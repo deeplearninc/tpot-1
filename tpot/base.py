@@ -358,7 +358,7 @@ class TPOTBase(BaseEstimator):
             self.n_jobs = n_jobs
 
         print("nJobs=%d"%self.n_jobs)
-        
+
         self._setup_pset()
         self._setup_toolbox()
 
@@ -1161,6 +1161,8 @@ class TPOTBase(BaseEstimator):
         try:
 
             operator_counts, eval_individuals_str, sklearn_pipeline_list, stats_dicts, unique_individuals = self._preprocess_individuals(individuals)
+            print("Size of package to evaluate: %d"%len(sklearn_pipeline_list))
+
             # Make the partial function that will be called below
             partial_wrapped_cross_val_score = partial(
                 _wrapped_cross_val_score,
@@ -1177,7 +1179,6 @@ class TPOTBase(BaseEstimator):
             result_score_list = []
             #DeepLearn code
             if self.sc is not None:
-                arPipelines = []
                 max_eval_time_seconds = self.max_eval_time_seconds
                 scoring_function = self.scoring_function
                 cv = self.cv
@@ -1185,7 +1186,7 @@ class TPOTBase(BaseEstimator):
                 over_sampler = self.over_sampler
                 def mapFunc(index):
                     return (index, _wrapped_cross_val_score(
-                        sklearn_pipeline=arPipelines[index],
+                        sklearn_pipeline=sklearn_pipeline_list[index],
                         features=br_features.value,
                         target=target,
                         cv=cv, #self.cv,
@@ -1205,30 +1206,37 @@ class TPOTBase(BaseEstimator):
                     result_score_list = self._update_val(val['result'], result_score_list)
                     self.auger_messenger.send_scores(sklearn_pipeline, unique_individuals[idx], features, target, val, self)
             else:
-              # chunk size for pbar update
-                for chunk_idx in range(0, len(sklearn_pipeline_list), self.n_jobs * 4):
-                    self._stop_by_max_time_mins()
-                    #DeepLearn code
-                    arPipelines = []
+                #DeepLearn code
+                if self.sc is not None:
                     arPipelineIdxs = []
-                    for sklearn_pipeline in sklearn_pipeline_list[chunk_idx:chunk_idx + self.n_jobs * 4]:
-                        arPipelineIdxs.append(len(arPipelines))
-                        arPipelines.append(sklearn_pipeline)
+                    self._stop_by_max_time_mins()
+                    for idx, sklearn_pipeline in enumerate(sklearn_pipeline_list):
+                        arPipelineIdxs.append(idx)
 
-                    if self.sc is not None:
-                        rddParams = self.sc.parallelize(arPipelineIdxs)
-                        indexed_result_score = dict(rddParams.map(mapFunc).collect())
-                        tmp_result_scores = [indexed_result_score[idx] for idx in range(len(indexed_result_score))]
-                    else:
-                    #DeepLearn code
-                        parallel = Parallel(n_jobs=self.n_jobs, verbose=0, pre_dispatch='2*n_jobs')
-                        tmp_result_scores = parallel(delayed(partial_wrapped_cross_val_score)(sklearn_pipeline=sklearn_pipeline)
-                                                   for sklearn_pipeline in arPipelines)
-                    # update pbar
-                    part_individuals = unique_individuals[chunk_idx:chunk_idx + self.n_jobs * 4] 
+                    rddParams = self.sc.parallelize(arPipelineIdxs)
+                    indexed_result_score = dict(rddParams.map(mapFunc).collect())
+                    tmp_result_scores = [indexed_result_score[idx] for idx in range(len(indexed_result_score))]
                     for idx, val in enumerate(tmp_result_scores):
                       result_score_list = self._update_val(val['result'], result_score_list)
-                      self.auger_messenger.send_scores(arPipelines[idx], part_individuals[idx], features, target, val, self)
+                      self.auger_messenger.send_scores(sklearn_pipeline_list[idx], unique_individuals[idx], features, target, val, self)
+                #DeepLearn code
+                else:
+                    # chunk size for pbar update
+                    for chunk_idx in range(0, len(sklearn_pipeline_list), self.n_jobs * 4):
+                        self._stop_by_max_time_mins()
+
+                        arPipelines = []
+                        for sklearn_pipeline in sklearn_pipeline_list[chunk_idx:chunk_idx + self.n_jobs * 4]:
+                            arPipelines.append(sklearn_pipeline)
+
+                        parallel = Parallel(n_jobs=self.n_jobs, verbose=0, pre_dispatch='2*n_jobs')
+                        tmp_result_scores = parallel(delayed(partial_wrapped_cross_val_score)(sklearn_pipeline=sklearn_pipeline)
+                                                       for sklearn_pipeline in arPipelines)
+                        # update pbar
+                        part_individuals = unique_individuals[chunk_idx:chunk_idx + self.n_jobs * 4] 
+                        for idx, val in enumerate(tmp_result_scores):
+                          result_score_list = self._update_val(val['result'], result_score_list)
+                          self.auger_messenger.send_scores(arPipelines[idx], part_individuals[idx], features, target, val, self)
 
             self._update_evaluated_individuals_(result_score_list, eval_individuals_str, operator_counts, stats_dicts)
 
