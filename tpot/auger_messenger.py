@@ -14,7 +14,7 @@ class AugerMessenger:
             self.fs_client = AugerFSClient( os.path.join(conn_info['host'], conn_info['channel']) )
             #self.r = redis.StrictRedis(host=conn_info['host'], port=conn_info['port'], db=conn_info['db'])
 
-    def send_scores(self, sklearn_pipeline, individual, features, target, result, tpot_instance):
+    def send_scores(self, result, exported_pipeline):
         uid = uuid.uuid4().hex[:15].upper()            
         data = {'uid': uid}
         data.update(result)
@@ -23,7 +23,8 @@ class AugerMessenger:
         #data['pipeline'] = self._format_pipeline_json(sklearn_pipeline.steps, features, target)
         #data['feature_matrix'] = self._collect_feature_list(sklearn_pipeline, features, target)
         data['score_mean'] = np.nanmean(data['scores']) if len(data['scores']) else 0
-        data['exported_pipeline'] = export_pipeline(individual, tpot_instance.operators, tpot_instance._pset, tpot_instance._imputed, data['score_mean'], True)
+        data['exported_pipeline'] = exported_pipeline
+        #data['exported_pipeline'] = export_pipeline(individual, tpot_instance.operators, tpot_instance._pset, tpot_instance._imputed, data['score_mean'], True)
 
         self._send_message_to_pipelines("score", data, uid)
 
@@ -33,6 +34,7 @@ class AugerMessenger:
     def _send_message(self, prefix, msg):
         if self.fs_client:
             file_name = "%s.json"%(prefix)
+            print("_send_message %s to %s"%(msg, file_name))
             self.fs_client.write_json_file(file_name, msg)
 
     def _send_message_to_pipelines(self, prefix, msg, uid):

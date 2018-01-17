@@ -400,8 +400,9 @@ def mutNodeReplacement(individual, pset):
 
 @threading_timeoutable(default="Timeout")
 def _wrapped_cross_val_score(sklearn_pipeline, features, target,
-                             cv, scoring_function, sample_weight=None, groups=None,
-                             over_sampler = None):
+                            cv, scoring_function, sample_weight=None, groups=None,
+                            over_sampler = None, auger_messenger = None,
+                            exported_pipeline = None):
     """Fit estimator and compute scores for a given dataset split.
     Parameters
     ----------
@@ -431,7 +432,7 @@ def _wrapped_cross_val_score(sklearn_pipeline, features, target,
     res = -1
     error = None
     feature_matrix = None
-    print("Start _wrapped_cross_val_score: %s"%str(sklearn_pipeline))
+    #print("Start _wrapped_cross_val_score: %s"%str(sklearn_pipeline))
     # DeepLearn code
 
     try:
@@ -484,16 +485,23 @@ def _wrapped_cross_val_score(sklearn_pipeline, features, target,
             res = np.nanmean(CV_scores)
     except TimeoutException:
         error = res = "Timeout"
+        print("Timeout. Evaluated %d from %d. Scores: %s. Pipeline: %s" % (len(CV_scores), cv_num, CV_scores, str(sklearn_pipeline)))
+
     except Exception as e:
         error = res = str(e)
-        print("Error: while running _wrapped_cross_val_score : %s\nTrace:\n%s" % (str(e), traceback.format_exc()))
+        print("Error while evaluating pipeline: %s : %s\nTrace:\n%s" % (str(sklearn_pipeline), str(e), traceback.format_exc()))
 
     if feature_matrix is None:
         feature_matrix = []
 
     if error is not None and len(CV_scores) > 0:
         res = np.nanmean(CV_scores)
-                
+
     response =  {'scores': CV_scores, "error": error, "result": res, "feature_matrix": feature_matrix}
-    print("End _wrapped_cross_val_score: %s\n%s"%(str(sklearn_pipeline), str(response)))
+
+    #print("End _wrapped_cross_val_score: %s\n%s"%(str(sklearn_pipeline), str(response)))
+
+    if auger_messenger is not None:
+        auger_messenger.send_scores(response, exported_pipeline)
+
     return response

@@ -511,7 +511,13 @@ class TPOTBase(BaseEstimator):
         self._toolbox.register('expr_mut', self._gen_grow_safe, min_=1, max_=4)
         self._toolbox.register('mutate', self._random_mutation_operator)
 
-    def fit(self, features, target, sample_weight=None, groups=None):
+    #Deeplearn
+    def evaluate(self, features, target, sample_weight=None, groups=None):
+        self.fit(features, target, sample_weight, groups, False)
+        return self._optimized_pipeline_score
+    #Deeplearn    
+    
+    def fit(self, features, target, sample_weight=None, groups=None, do_fitted_pipeline = True):
         """Fit an optimized machine learning pipeline.
 
         Uses genetic programming to optimize a machine learning pipeline that
@@ -676,7 +682,9 @@ class TPOTBase(BaseEstimator):
                         self._pbar.close()
 
                     self._update_top_pipeline()
-                    self._summary_of_best_pipeline(features, target)
+                    if do_fitted_pipeline:
+                        self._summary_of_best_pipeline(features, target)
+
                     # Delete the temporary cache before exiting
                     self._cleanup_memory()
                     break
@@ -1163,6 +1171,10 @@ class TPOTBase(BaseEstimator):
             operator_counts, eval_individuals_str, sklearn_pipeline_list, stats_dicts, unique_individuals = self._preprocess_individuals(individuals)
             print("Size of package to evaluate: %d"%len(sklearn_pipeline_list))
 
+            exported_pipelines = []        
+            for idx in range(0, len(sklearn_pipeline_list)):
+                exported_pipelines.append(export_pipeline(unique_individuals[idx], self.operators, self._pset, self._imputed, 0.0, True))
+
             # Make the partial function that will be called below
             partial_wrapped_cross_val_score = partial(
                 _wrapped_cross_val_score,
@@ -1173,7 +1185,8 @@ class TPOTBase(BaseEstimator):
                 sample_weight=sample_weight,
                 groups=groups,
                 timeout=self.max_eval_time_seconds,
-                over_sampler=self.over_sampler
+                over_sampler=self.over_sampler,
+                auger_messenger = self.auger_messenger
             )
 
             result_score_list = []
@@ -1184,6 +1197,7 @@ class TPOTBase(BaseEstimator):
                 cv = self.cv
                 br_features = self.sc.broadcast(features)
                 over_sampler = self.over_sampler
+                auger_messenger = self.auger_messenger
                 def mapFunc(index):
                     return (index, _wrapped_cross_val_score(
                         sklearn_pipeline=sklearn_pipeline_list[index],
@@ -1194,7 +1208,9 @@ class TPOTBase(BaseEstimator):
                         sample_weight=sample_weight,
                         groups=groups,
                         timeout=max_eval_time_seconds, #self.max_eval_time_mins,
-                        over_sampler=over_sampler
+                        over_sampler=over_sampler,
+                        auger_messenger = auger_messenger,
+                        exported_pipeline = exported_pipelines[index]
                     ))
             #DeepLearn code
 
@@ -1202,9 +1218,9 @@ class TPOTBase(BaseEstimator):
             if self.n_jobs == 1:
                 for idx, sklearn_pipeline in enumerate(sklearn_pipeline_list):
                     self._stop_by_max_time_mins()
-                    val = partial_wrapped_cross_val_score(sklearn_pipeline=sklearn_pipeline)
+                    val = partial_wrapped_cross_val_score(sklearn_pipeline=sklearn_pipeline, exported_pipeline = exported_pipelines[idx])
                     result_score_list = self._update_val(val['result'], result_score_list)
-                    self.auger_messenger.send_scores(sklearn_pipeline, unique_individuals[idx], features, target, val, self)
+                    #self.auger_messenger.send_scores(val, exported_pipelines[idx])
             else:
                 #DeepLearn code
                 if self.sc is not None:
@@ -1212,13 +1228,12 @@ class TPOTBase(BaseEstimator):
                     self._stop_by_max_time_mins()
                     for idx, sklearn_pipeline in enumerate(sklearn_pipeline_list):
                         arPipelineIdxs.append(idx)
-
                     rddParams = self.sc.parallelize(arPipelineIdxs)
+
                     indexed_result_score = dict(rddParams.map(mapFunc).collect())
                     tmp_result_scores = [indexed_result_score[idx] for idx in range(len(indexed_result_score))]
                     for idx, val in enumerate(tmp_result_scores):
                       result_score_list = self._update_val(val['result'], result_score_list)
-                      self.auger_messenger.send_scores(sklearn_pipeline_list[idx], unique_individuals[idx], features, target, val, self)
                 #DeepLearn code
                 else:
                     # chunk size for pbar update
@@ -1233,10 +1248,10 @@ class TPOTBase(BaseEstimator):
                         tmp_result_scores = parallel(delayed(partial_wrapped_cross_val_score)(sklearn_pipeline=sklearn_pipeline)
                                                        for sklearn_pipeline in arPipelines)
                         # update pbar
-                        part_individuals = unique_individuals[chunk_idx:chunk_idx + self.n_jobs * 4] 
+                        part_exported_pipelines = exported_pipelines[chunk_idx:chunk_idx + self.n_jobs * 4] 
                         for idx, val in enumerate(tmp_result_scores):
                           result_score_list = self._update_val(val['result'], result_score_list)
-                          self.auger_messenger.send_scores(arPipelines[idx], part_individuals[idx], features, target, val, self)
+                          #self.auger_messenger.send_scores(val, part_exported_pipelines[idx])
 
             self._update_evaluated_individuals_(result_score_list, eval_individuals_str, operator_counts, stats_dicts)
 
