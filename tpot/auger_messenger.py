@@ -26,7 +26,7 @@ class AugerMessenger:
         data['exported_pipeline'] = exported_pipeline
         #data['exported_pipeline'] = export_pipeline(individual, tpot_instance.operators, tpot_instance._pset, tpot_instance._imputed, data['score_mean'], True)
 
-        self._send_message_to_pipelines("score", data, uid)
+        self._send_message_to_pipelines("score_%d"%(float(format(data['score_mean'], '.3f'))*1000), data, uid)
 
     def send_status_eval(self, status, total_evals=0):
         self._send_message( 'evaluation_status', {'status': status, 'total_evaluations': total_evals})
