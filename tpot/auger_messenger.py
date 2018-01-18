@@ -34,7 +34,7 @@ class AugerMessenger:
     def _send_message(self, prefix, msg):
         if self.fs_client:
             file_name = "%s.json"%(prefix)
-            print("_send_message %s to %s"%(msg, file_name))
+            #print("_send_message %s to %s"%(msg, file_name))
             self.fs_client.write_json_file(file_name, msg)
 
     def _send_message_to_pipelines(self, prefix, msg, uid):

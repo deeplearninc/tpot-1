@@ -280,7 +280,7 @@ def eaMuPlusLambda(population, toolbox, mu, lambda_, cxpb, mutpb, ngen, pbar,
         if not pbar.disable:
             # Print only the best individual fitness
             if verbose == 2:
-                high_score = abs(max([halloffame.keys[x].wvalues[1] for x in range(len(halloffame.keys))]))
+                high_score = max([halloffame.keys[x].wvalues[1] for x in range(len(halloffame.keys))])
                 pbar.write('Generation {0} - Current best internal CV score: {1}'.format(gen, high_score))
 
             # Print the entire Pareto front
@@ -288,8 +288,8 @@ def eaMuPlusLambda(population, toolbox, mu, lambda_, cxpb, mutpb, ngen, pbar,
                 pbar.write('Generation {} - Current Pareto front scores:'.format(gen))
                 for pipeline, pipeline_scores in zip(halloffame.items, reversed(halloffame.keys)):
                     pbar.write('{}\t{}\t{}'.format(
-                            int(abs(pipeline_scores.wvalues[0])),
-                            abs(pipeline_scores.wvalues[1]),
+                            int(pipeline_scores.wvalues[0]),
+                            pipeline_scores.wvalues[1],
                             pipeline
                         )
                     )
@@ -401,7 +401,7 @@ def mutNodeReplacement(individual, pset):
 @threading_timeoutable(default="Timeout")
 def _wrapped_cross_val_score(sklearn_pipeline, features, target,
                             cv, scoring_function, sample_weight=None, groups=None,
-                            over_sampler = None, auger_messenger = None,
+                            over_sampler = None, msg_info = None,
                             exported_pipeline = None):
     """Fit estimator and compute scores for a given dataset split.
     Parameters
@@ -428,6 +428,7 @@ def _wrapped_cross_val_score(sklearn_pipeline, features, target,
     """
     # DeepLearn code
     from auger_messenger import AugerMessenger
+
     CV_scores = []
     res = -1
     error = None
@@ -501,7 +502,7 @@ def _wrapped_cross_val_score(sklearn_pipeline, features, target,
 
     #print("End _wrapped_cross_val_score: %s\n%s"%(str(sklearn_pipeline), str(response)))
 
-    if auger_messenger is not None:
-        auger_messenger.send_scores(response, exported_pipeline)
+    if msg_info is not None:
+        AugerMessenger(msg_info).send_scores(response, exported_pipeline)
 
     return response
