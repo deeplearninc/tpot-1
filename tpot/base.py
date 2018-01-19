@@ -1242,7 +1242,10 @@ class TPOTBase(BaseEstimator):
                     indexed_result_score = dict(rddParams.map(mapFunc).collect())
                     tmp_result_scores = [indexed_result_score[idx] for idx in range(len(indexed_result_score))]
                     for idx, val in enumerate(tmp_result_scores):
-                      result_score_list = self._update_val(val['result'], result_score_list)
+                        if isinstance(val, dict):
+                            val = val.get('result')
+                                
+                        result_score_list = self._update_val(val, result_score_list)
                 #DeepLearn code
                 else:
                     # chunk size for pbar update
