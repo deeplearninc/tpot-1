@@ -567,7 +567,7 @@ class TPOTBase(BaseEstimator):
             Returns a copy of the fitted TPOT object
 
         """
-        if features and target:
+        if features is not None and target is not None:
             features = features.astype(np.float64)
 
             # Resets the imputer to be fit for the new dataset
