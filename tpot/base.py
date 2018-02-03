@@ -270,6 +270,7 @@ class TPOTBase(BaseEstimator):
         self.sc = sc
         self.over_sampler = over_sampler
         self.auger_messenger = AugerMessenger(msg_info)
+        self.trials = None
         # DeepLearn code
 
         self.max_eval_time_seconds = max(int(self.max_eval_time_mins * 60), 1)
@@ -521,11 +522,11 @@ class TPOTBase(BaseEstimator):
         self._toolbox.register('mutate', self._random_mutation_operator)
 
     #Deeplearn
-    def evaluate_ex(self, features, target, sample_weight=None, groups=None):
+    def evaluate(self, features, target, sample_weight=None, groups=None):
         self.fit(features, target, sample_weight, groups, False)
         return self._optimized_pipeline_score
 
-    def evaluate(self, trails):
+    def evaluate_trials(self, trails):
         self.trials = trails
         self.fit(None, None, None, None, False)
         return self._optimized_pipeline_score
@@ -1231,11 +1232,20 @@ class TPOTBase(BaseEstimator):
             #DeepLearn code
 
             # Don't use parallelization if n_jobs==1
-            if self.n_jobs == 1:
+            if self.trials is not None:
+                self._stop_by_max_time_mins()
+                trial_list = []
+                for idx, sklearn_pipeline in enumerate(sklearn_pipeline_list):
+                    trial_list.append({"pipeline":sklearn_pipeline, "exported_pipeline": exported_pipelines[idx]})
+
+                tmp_result_scores = self.trials.execute_trials(trial_list)
+                for idx, val in enumerate(tmp_result_scores):
+                  result_score_list = self._update_val(val['result'], result_score_list)
+
+            elif self.n_jobs == 1:
                 for idx, sklearn_pipeline in enumerate(sklearn_pipeline_list):
                     self._stop_by_max_time_mins()
-                    val = self.trials.execute_trial({"pipeline":sklearn_pipeline, "exported_pipeline": exported_pipelines[idx]})
-                    #val = partial_wrapped_cross_val_score(sklearn_pipeline=sklearn_pipeline, exported_pipeline = exported_pipelines[idx])
+                    val = partial_wrapped_cross_val_score(sklearn_pipeline=sklearn_pipeline, exported_pipeline = exported_pipelines[idx])
                     result_score_list = self._update_val(val['result'], result_score_list)
                     #self.auger_messenger.send_scores(val, exported_pipelines[idx])
             else:
