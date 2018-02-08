@@ -1236,11 +1236,18 @@ class TPOTBase(BaseEstimator):
                 self._stop_by_max_time_mins()
                 trial_list = []
                 for idx, sklearn_pipeline in enumerate(sklearn_pipeline_list):
-                    trial_list.append({"pipeline":sklearn_pipeline, "exported_pipeline": exported_pipelines[idx]})
+                    #"pipeline":sklearn_pipeline,
+                    trial_list.append({"exported_pipeline": exported_pipelines[idx]})
 
                 tmp_result_scores = self.trials.execute_trials(trial_list)
+                stop_evaluate = False
                 for idx, val in enumerate(tmp_result_scores):
                   result_score_list = self._update_val(val['result'], result_score_list)
+                  if val.get('error', "") == 'cancel':
+                    stop_evaluate = True
+
+                if stop_evaluate:
+                    raise KeyboardInterrupt('TPOT evaluation cancelled.')
 
             elif self.n_jobs == 1:
                 for idx, sklearn_pipeline in enumerate(sklearn_pipeline_list):
@@ -1567,15 +1574,15 @@ class TPOTBase(BaseEstimator):
         """
         self._update_pbar()
         if val == 'Timeout':
-            self._update_pbar(pbar_msg=('Skipped pipeline #{0} due to time out. '
-                                        'Continuing to the next pipeline.'.format(self._pbar.n)))
+            # self._update_pbar(pbar_msg=('Skipped pipeline #{0} due to time out. '
+            #                             'Continuing to the next pipeline.'.format(self._pbar.n)))
             result_score_list.append(-float('inf'))
         elif isinstance(val, float):
             result_score_list.append(val)
         else: #Error
             print("Pipeline error:\n%s"%val)
-            self._update_pbar(pbar_msg=('Skipped pipeline #{0} due to error. '
-                                        'Continuing to the next pipeline.'.format(self._pbar.n)))
+            # self._update_pbar(pbar_msg=('Skipped pipeline #{0} due to error. '
+            #                             'Continuing to the next pipeline.'.format(self._pbar.n)))
             result_score_list.append(-float('inf'))
 
         return result_score_list
