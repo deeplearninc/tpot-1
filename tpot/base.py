@@ -75,7 +75,7 @@ from .gp_deap import eaMuPlusLambda, mutNodeReplacement, _wrapped_cross_val_scor
 import traceback
 import pickle
 
-from auger_messenger import AugerMessenger
+from auger_ml.auger_messenger import AugerMessenger
 
 # hot patch for Windows: solve the problem of crashing python after Ctrl + C in Windows OS
 # https://github.com/ContinuumIO/anaconda-issues/issues/905
@@ -687,7 +687,7 @@ class TPOTBase(BaseEstimator):
         except Exception as exc:
             print("Error while running eaMuPlusLambda : %s" % str(exc))
             print(traceback.format_exc())
-            raise e
+            raise exc
         finally:
             # keep trying 10 times in case weird things happened like multiple CTRL+C or exceptions
             attempts = 1 #10
@@ -1240,14 +1240,8 @@ class TPOTBase(BaseEstimator):
                     trial_list.append({"exported_pipeline": exported_pipelines[idx]})
 
                 tmp_result_scores = self.trials.execute_trials(trial_list)
-                stop_evaluate = False
-                for idx, val in enumerate(tmp_result_scores):
-                  result_score_list = self._update_val(val['result'], result_score_list)
-                  if val.get('error', "") == 'cancel':
-                    stop_evaluate = True
-
-                if stop_evaluate:
-                    raise KeyboardInterrupt('TPOT evaluation cancelled.')
+                for val in tmp_result_scores:
+                    result_score_list = self._update_val(val.result, result_score_list)
 
             elif self.n_jobs == 1:
                 for idx, sklearn_pipeline in enumerate(sklearn_pipeline_list):
