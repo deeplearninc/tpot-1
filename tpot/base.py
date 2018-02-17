@@ -526,8 +526,8 @@ class TPOTBase(BaseEstimator):
         self.fit(features, target, sample_weight, groups, False)
         return self._optimized_pipeline_score
 
-    def evaluate_trials(self, trails):
-        self.trials = trails
+    def evaluate_trials(self, trials):
+        self.trials = trials
         self.fit(None, None, None, None, False)
         return self._optimized_pipeline_score
 
