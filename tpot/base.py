@@ -1241,7 +1241,7 @@ class TPOTBase(BaseEstimator):
 
                 tmp_result_scores = self.trials.execute_trials(trial_list)
                 for val in tmp_result_scores:
-                    result_score_list = self._update_val(val.result, result_score_list)
+                    result_score_list = self._update_val(val['result'], result_score_list)
 
             elif self.n_jobs == 1:
                 for idx, sklearn_pipeline in enumerate(sklearn_pipeline_list):
