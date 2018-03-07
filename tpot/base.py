@@ -1237,7 +1237,7 @@ class TPOTBase(BaseEstimator):
                 trial_list = []
                 for idx, sklearn_pipeline in enumerate(sklearn_pipeline_list):
                     #"pipeline":sklearn_pipeline,
-                    trial_list.append({"exported_pipeline": exported_pipelines[idx]})
+                    trial_list.append({"exported_pipeline": exported_pipelines[idx], 'optimizer_name': 'auger_ml.optimizers.tpot_optimizer.TPOTOptimizer'})
 
                 tmp_result_scores = self.trials.execute_trials(trial_list)
                 stop_evaluate = False
