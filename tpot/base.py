@@ -270,6 +270,7 @@ class TPOTBase(BaseEstimator):
         self.sc = sc
         self.over_sampler = over_sampler
         self.auger_messenger = AugerMessenger(msg_info)
+        self.trials = None
         # DeepLearn code
 
         self.max_eval_time_seconds = max(int(self.max_eval_time_mins * 60), 1)
@@ -524,6 +525,12 @@ class TPOTBase(BaseEstimator):
     def evaluate(self, features, target, sample_weight=None, groups=None):
         self.fit(features, target, sample_weight, groups, False)
         return self._optimized_pipeline_score
+
+    def evaluate_trials(self, trails):
+        self.trials = trails
+        self.fit(None, None, None, None, False)
+        return self._optimized_pipeline_score
+
     #Deeplearn    
     
     def fit(self, features, target, sample_weight=None, groups=None, do_fitted_pipeline = True):
@@ -561,29 +568,30 @@ class TPOTBase(BaseEstimator):
             Returns a copy of the fitted TPOT object
 
         """
-        features = features.astype(np.float64)
+        if features is not None and target is not None:
+            features = features.astype(np.float64)
 
-        # Resets the imputer to be fit for the new dataset
-        self._fitted_imputer = None
-        self._imputed = False
-        # If features is a sparse matrix, do not apply imputation
-        if sparse.issparse(features):
-            if self.config_dict_params in [None, "TPOT light", "TPOT MDR"]:
-                raise ValueError(
-                    'Not all operators in {} supports sparse matrix. '
-                    'Please use \"TPOT sparse\" for sparse matrix.'.format(self.config_dict_params)
-                )
-            elif self.config_dict_params != "TPOT sparse":
-                print(
-                    'Warning: Since the input matrix is a sparse matrix, please makes sure all the operators in the '
-                    'customized config dictionary supports sparse matriies.'
-                )
-        else:
-            if np.any(np.isnan(features)):
-                self._imputed = True
-                features = self._impute_values(features)
+            # Resets the imputer to be fit for the new dataset
+            self._fitted_imputer = None
+            self._imputed = False
+            # If features is a sparse matrix, do not apply imputation
+            if sparse.issparse(features):
+                if self.config_dict_params in [None, "TPOT light", "TPOT MDR"]:
+                    raise ValueError(
+                        'Not all operators in {} supports sparse matrix. '
+                        'Please use \"TPOT sparse\" for sparse matrix.'.format(self.config_dict_params)
+                    )
+                elif self.config_dict_params != "TPOT sparse":
+                    print(
+                        'Warning: Since the input matrix is a sparse matrix, please makes sure all the operators in the '
+                        'customized config dictionary supports sparse matriies.'
+                    )
+            else:
+                if np.any(np.isnan(features)):
+                    self._imputed = True
+                    features = self._impute_values(features)
 
-        self._check_dataset(features, target)
+            self._check_dataset(features, target)
 
         # Randomly collect a subsample of training samples for pipeline optimization process.
         if self.subsample < 1.0:
@@ -682,7 +690,7 @@ class TPOTBase(BaseEstimator):
             raise e
         finally:
             # keep trying 10 times in case weird things happened like multiple CTRL+C or exceptions
-            attempts = 10
+            attempts = 1 #10
             for attempt in range(attempts):
                 try:
                     # Close the progress bar
@@ -1224,7 +1232,24 @@ class TPOTBase(BaseEstimator):
             #DeepLearn code
 
             # Don't use parallelization if n_jobs==1
-            if self.n_jobs == 1:
+            if self.trials is not None:
+                self._stop_by_max_time_mins()
+                trial_list = []
+                for idx, sklearn_pipeline in enumerate(sklearn_pipeline_list):
+                    #"pipeline":sklearn_pipeline,
+                    trial_list.append({"exported_pipeline": exported_pipelines[idx], 'optimizer_name': 'auger_ml.optimizers.tpot_optimizer.TPOTOptimizer'})
+
+                tmp_result_scores = self.trials.execute_trials(trial_list)
+                stop_evaluate = False
+                for idx, val in enumerate(tmp_result_scores):
+                  result_score_list = self._update_val(val['result'], result_score_list)
+                  if val.get('error', "") == 'cancel':
+                    stop_evaluate = True
+
+                if stop_evaluate:
+                    raise KeyboardInterrupt('TPOT evaluation cancelled.')
+
+            elif self.n_jobs == 1:
                 for idx, sklearn_pipeline in enumerate(sklearn_pipeline_list):
                     self._stop_by_max_time_mins()
                     val = partial_wrapped_cross_val_score(sklearn_pipeline=sklearn_pipeline, exported_pipeline = exported_pipelines[idx])
@@ -1549,15 +1574,15 @@ class TPOTBase(BaseEstimator):
         """
         self._update_pbar()
         if val == 'Timeout':
-            self._update_pbar(pbar_msg=('Skipped pipeline #{0} due to time out. '
-                                        'Continuing to the next pipeline.'.format(self._pbar.n)))
+            # self._update_pbar(pbar_msg=('Skipped pipeline #{0} due to time out. '
+            #                             'Continuing to the next pipeline.'.format(self._pbar.n)))
             result_score_list.append(-float('inf'))
         elif isinstance(val, float):
             result_score_list.append(val)
         else: #Error
             print("Pipeline error:\n%s"%val)
-            self._update_pbar(pbar_msg=('Skipped pipeline #{0} due to error. '
-                                        'Continuing to the next pipeline.'.format(self._pbar.n)))
+            # self._update_pbar(pbar_msg=('Skipped pipeline #{0} due to error. '
+            #                             'Continuing to the next pipeline.'.format(self._pbar.n)))
             result_score_list.append(-float('inf'))
 
         return result_score_list
