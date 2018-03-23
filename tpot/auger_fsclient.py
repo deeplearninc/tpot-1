@@ -1,6 +1,6 @@
 import os
 import os.path
-import boto3
+
 try:
   from urllib.parse import urlparse
 except ImportError:
@@ -11,6 +11,7 @@ except ImportError:
 class AugerS3FSClient:
 
     def __init__(self, path):
+        from boto3 import boto3
         self.bucket = os.environ.get('S3_DATA_PATH')
 
         if path is not None and (path.startswith("s3://") or path.startswith("s3a://") or path.startswith("s3n://")):
